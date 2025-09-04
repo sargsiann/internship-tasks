@@ -1,0 +1,17 @@
+#!/bin/bash 
+
+#the indicator of shell script type can be also zsh or bash
+
+
+#FIRST APPROACH OF SOLUTION WORKS IN average 0.0170~ secs maximum is 0.04 minimum is 0.01you can check by runing ./perf_check ./find_add <test numbers you want>
+all_files=$(find . -type f -name *.c) #find is the command for finding specific files or dirs , . means current directory, -type means only files -name about name *.c is wildcart means something that ends witn .c format assigning it to variable
+
+while IFS= read -r line; do #Regards IFS= we have tabs and spaces in start and end, -r argument helps us to understan / also as a symbols not specific symbols read reads from stdin and store value before first \n and remembers its index as real read() in C
+	cp $line "$line.orig" # copy ing line by adding .orig at end
+	if [ $? -ne 0 ]; then #if the result of last executed command (its cp in our case)
+		echo "failed to copy $line to $line.orig"
+	else
+		echo "Copied $line to $line.orig Succesfully"
+	fi
+done <<< "$all_files" #pushing our all_files variable to stdin for our read to read
+
