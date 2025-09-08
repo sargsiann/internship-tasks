@@ -15,6 +15,8 @@ typedef	struct cmd {
 	char	**args;
 }	t_cmd;
 
+void free_cmd(t_cmd *cmd);
+
 void print_args(t_cmd *cmd);
 
 
@@ -135,7 +137,13 @@ void exec_cmds(t_cmd *c1, t_cmd *c2, t_cmd *c3, char *filename) {
     if (pid1 == 0) {
         execve(c1->path, c1->args, NULL);
         perror("execve c1 failed");
-        exit(EXIT_FAILURE);
+		// FIX : if c1 fails we need to free child process memory open pipe descriptors and exit
+		free_cmd(c1);
+		free_cmd(c2);
+		free_cmd(c3);
+		close(pipefd[0]);
+		close(pipefd[1]);
+		exit(EXIT_FAILURE);
     }
 	int status1;
     waitpid(pid1, &status1, 0); // checkinf for pid1
@@ -232,6 +240,11 @@ int main(int ac, char *av[])
 	cmd3.args = get_cmd_args(av[3]);
 
 	exec_cmds(&cmd1,&cmd2,&cmd3, av[4]);
+	// Even after exiting child process with return we need to free memory in each process address space
+	// because its allocated in heap and not in stack
+	// so each process have its own copy of heap memory
+	// so we need to free it in each process
+	// so we free it in parent process after all childs ended
 	free_cmd(&cmd1);
 	free_cmd(&cmd2);
 	free_cmd(&cmd3);
