@@ -1,5 +1,3 @@
----
-
 # print\_dir
 
 **print\_dir** is a lightweight and safe C tool for Linux that displays a directory’s contents in a tree-like format.
@@ -12,7 +10,6 @@ It also counts directories, files, links, sockets, pipes, and devices — making
 * **Tree View**: Displays files and folders in a clear hierarchical structure.
 * **Optional Recursion**: Use `-r` to explore all subfolders.
 * **Object Counting**: Tracks:
-
   * Directories
   * Files
   * Symbolic links
@@ -43,6 +40,12 @@ It also counts directories, files, links, sockets, pipes, and devices — making
 make print_dir
 # or build all targets
 make all
+# for cleaning object files
+make clean
+# full cleaning
+make fclean
+# recompling
+make re
 ```
 
 ---
