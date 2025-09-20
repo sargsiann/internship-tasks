@@ -1,5 +1,8 @@
 {
 	"files.associations": {
-		"cstdlib": "c"
-	}
+		"cstdlib": "c",
+		"errno.h": "c",
+		"header.h": "c"
+	},
+	"C_Cpp.errorSquiggles": "disabled"
 }

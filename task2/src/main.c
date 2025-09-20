@@ -105,7 +105,6 @@ void	recursive_move_dirs(char *dirname, int	depth)
 
 int main(int argc, char *argv[])
 {
-
 	setup_signal_handlers();
 	// FIX 2: ------------------------------------------------------------------------------
 	if (!get_stack_address(&stack_address) && !get_stack_size()) // GETTING STACK SIZE AND ADDRESS FOR STACK OVERFLOW PROTECTION
