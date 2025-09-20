@@ -1,5 +1,6 @@
 #include "header.h"
-// FIX 4: using wordexp for complex parsing like nested quotes
+// FIX 4: using wordexp for complex parsing like nested quotes 
+// WORDEXP PARSES GIVEN LINE LIKE SHELL SO ITS GOOD UTILITY TO PARSE
 char **get_cmd_args(char *line) 
 {
 	long	arg_max = sysconf(_SC_ARG_MAX) - env_size();	

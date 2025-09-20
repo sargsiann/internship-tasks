@@ -41,5 +41,6 @@ void	signal_handler() ;
 void	set_signal_handlers() ;
 void	block_signals(sigset_t *old_set) ;
 void	unblock_signals(sigset_t *old_set) ;
+bool	get_users_answer() ;
 
 #endif

@@ -16,7 +16,7 @@ void	set_signal_handlers()
 	sigaction(SIGQUIT,&sa,NULL);
 }
 
-void	block_signals(sigset_t *old_set) 
+void	block_signals(sigset_t *old_set) // blocking signals in fork calls 
 {
 	sigset_t block_set;
 	sigemptyset(&block_set); // clearing blocked signals data structure
@@ -26,7 +26,29 @@ void	block_signals(sigset_t *old_set)
 	sigprocmask(SIG_BLOCK,&block_set,old_set);
 }
 
-void	unblock_signals(sigset_t *old_set) 
+void	unblock_signals(sigset_t *old_set)  // unblocking from previous blocket data structure
 {
 	sigprocmask(SIG_SETMASK,old_set,NULL);
+}
+
+
+bool	get_users_answer() {
+	char answer[4] = {0};
+	
+	printf("The output file already exists. Do you want to overwrite it? (yes/no): ");
+	do {
+		fgets(answer, sizeof(answer), stdin);
+		// Remove newline character if present
+		if (interrupted) { // Check for interruption to avoid memleaks
+			fprintf(stderr,"Operation interrupted by signal. Exiting without overwriting the file.\n");
+			return false;
+		}
+		answer[strcspn(answer, "\n")] = 0;
+	} while (strcmp(answer, "yes") != 0 && strcmp(answer, "no") != 0);
+
+	if (strcmp(answer, "yes") == 0) {
+		return true;
+	} else {
+		return false;
+	}
 }

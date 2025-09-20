@@ -1,4 +1,5 @@
 Task #3 – Execute Shell Pipeline in C
+EACH TASK FIXES ARE IN ITS FILES
 
 This project demonstrates two approaches to implement the shell command:
 

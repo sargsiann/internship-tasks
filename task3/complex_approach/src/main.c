@@ -8,11 +8,12 @@ extern char **environ;
 
 void get_cmd_path(t_cmd *cmd_struct) 
 {
-	if (!cmd_struct || !(*cmd_struct->args) || !(*cmd_struct->args[0]))
+	if (!cmd_struct || !(*cmd_struct->args) || !(*cmd_struct->args[0])) //Null checking
 		return ;
+	
 	char	*cmd = cmd_struct->args[0];
 	int		path_fd;
-	if (is_path(cmd)) {
+	if (is_path(cmd)) { 
 		get_file_fd(cmd,cmd_struct);
 		return ;
 	}
@@ -21,6 +22,7 @@ void get_cmd_path(t_cmd *cmd_struct)
 		cmd_struct->path_fd = -1;
 		return ;
 	}
+
 
 	env = strdup(env); 
 	if (!env)
@@ -33,23 +35,17 @@ void get_cmd_path(t_cmd *cmd_struct)
 	char	*exes = strtok(env,":");
 	char	path[PATH_MAX] = {0}; // the max path size that programm can handle
 	int		written;
-	struct stat dir_stat;
 	while (exes != NULL)
 	{
-		//FIX1: command path lenght handling, buffer overflow, snprintf return value check
 		written = snprintf(path, sizeof(path), "%s/%s", exes, cmd);
 		if (written < 0 || written >= PATH_MAX) 
 		{
 			cmd_struct->path_fd = -1;
 			free(env);
 			fprintf(stderr, "Error: Path length for command '%s' is too long or snprintf error occurred.\n", cmd);
+			return ;
 		}
-		// Skipping the directories that are writable by user or group to avoid extracting non root paths
-		if (stat(exes, &dir_stat) == 0 && (dir_stat.st_mode & (S_IWOTH | S_IWGRP))) {
-    		exes = strtok(NULL, ":");
-    		continue;
-		}
-		// FIX2: using fd s instead of access For avoid TOCTOU 
+		// using fd s instead of access For avoid TOCTOU 
 		// (If we have file descriptor we sure that we working exactly with that executable and not swapped file)
 		if ((path_fd = get_file_fd(path,cmd_struct)) != -1)
 		{
@@ -61,13 +57,8 @@ void get_cmd_path(t_cmd *cmd_struct)
 	free(env); // freeing dupped memory
 }
 
-
-
-
-
-
 int main(int ac, char *av[]) 
-{ 	
+{ 
 	if (ac != 5) {
 		fprintf(stderr,"Error : usage is ./exec [p1] [p2] [p3] [file]\n");
 		return 1;

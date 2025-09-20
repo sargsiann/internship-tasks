@@ -1,0 +1,31 @@
+# Basic pipeline
+./exec "true" "ls -l" "grep .c" output.txt
+
+# Infinite stream test
+./exec "true" "yes" "head -5" result.txt
+
+# Sleep cases pipe all takes 10 secs as in shell
+./exec "true" "sleep 5" "sleep 10" result.txt
+./exec "true" "sleep 10" "sleep 5" result.txt
+
+
+# sigint sigquit all interuption tests 
+./exec "sleep 10" "yes" "head -3" test.txt
+
+Fixed Issue,Status,Protection
+Buffer Overflow,✅ Fixed,snprintf + PATH_MAX limits
+TOCTOU Race,✅ Fixed,fexecve + file mod_time check
+Child Process Errors,✅ Fixed,exit() instead of return
+Command Injection,✅ Fixed,wordexp + WRDE_NOCMD flag
+System Call Failures,✅ Fixed,All calls checked with perror
+Memory Leaks,✅ Fixed,free_cmds() in all error paths
+Environment Issues,✅ Fixed,environ validation + safe PATH
+Resource DoS,✅ Fixed,"MAX_ARG_LEN=1024"
+Signal Handling,✅ Fixed,"SIGINT, SIGTERM, SIGPIPE"
+File Descriptor Leaks,✅ Fixed,close_inherited_fds()
+
+p1 && p2 | p3 > file
+├── p1: Runs first, must exit 0 to continue
+├── p2: Writes to pipe (stdout → pipefd[1])
+├── p3: Reads from pipe (pipefd[0] → stdin)
+└── file: p3 output redirected to file
