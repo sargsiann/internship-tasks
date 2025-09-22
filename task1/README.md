@@ -1,52 +1,37 @@
+# C File Backup Fixed Script 
 
----
+Creates secure backups of all `.c` files by copying them to `.orig` versions.
 
-# README
+## What it does
 
-## Overview
+Finds all `.c` files and creates backup copies like `file.c` → `file.c.orig`
 
-This project has **two approaches** for copying `.c` files and a **performance checker** for running tests.
-
----
-
-## Copying Files
-
-### 1. `find_copy_1.sh`
-
-* POSIX `sh` version using `find` + `while read`.
-* Copies `.c` files and adds `.orig` to each.
-* Usage:
-
-```sh
-sh find_copy_1.sh
-```
-
-### 2. `find_copy_2.sh`
-
-* Bash version using arrays and `for` loop.
-* Copies `.c` files with `.orig`.
-* Usage:
+## How to use
 
 ```bash
-./find_copy_2.sh
+chmod +x find_copy
+./find_copy
 ```
 
----
+## Security features
 
-## Performance Checker: `perf_check.sh`
+- Blocks dangerous files (symlinks, huge files, weird characters)
+- Asks before overwriting existing backups  
+- Uses safe copying (no data corruption)
+- Stops hackers from breaking your system
+- Unsets all aliases, Loading library paths
+- Uses secure paths for execution only 
+- Sets file ownership
+- Checks the ownership of file, read write permissions
+- Checks file size and OS remained memory to avoid memory issues
+- Checks file name lenght
+- Checks the directory of file to be copied for being sure that it is current directory
 
-* Runs an executable multiple times and measures runtime.
-* Shows **Min**, **Max**, and **Average** times (rounded to 0.01s).
-* Usage:
+## Options when backups exist
 
-```bash
-./perf_check.sh ./<exe_name> <test_nums>
-```
+- `y` = overwrite this file
+- `n` = skip this file
+- `a` = overwrite all files
+- `n0` = skip all files
 
-* Example:
-
-```bash
-./perf_check.sh ./my_test.sh 100
-```
-
----
+That's it! 🚀

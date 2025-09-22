@@ -1,13 +1,12 @@
 #include "header.h"
 
-extern size_t recursion_size_bytes;
 extern size_t used_stack_bytes;
 extern size_t stack_size;
-extern int max_open_files; 
+extern int available_fds; 
 
 bool	check_stack_overflow() 
 {
-	if (used_stack_bytes + 2 * recursion_size_bytes >= stack_size - 256) { // left some memory for function calls etc
+	if (stack_size - used_stack_bytes <= 4096) { // left some memory for function calls etc
 		fprintf(stderr, "Error: Stack overflow protection triggered. Recursion depth too high.\n");
 		return false; // do not allow to continue
 	}
@@ -16,7 +15,7 @@ bool	check_stack_overflow()
 
 bool	check_remained_fds() 
 {
-	if (max_open_files <= 16) { // should not happen because of check in main
+	if (available_fds <= 8) { // should not happen because of check in main
 		fprintf(stderr, "Error: Its Dangerous to run the program, Maximum open file descpritors limit is too small\n");
 		return false;
 	}
@@ -32,7 +31,10 @@ bool	path_check(char *dirname, char *new_dname)
 		fprintf(stderr,"Error : Directory name is too big %s/%s\n",dirname,new_dname);
 		return false;
 	}
-	if (strlen(dirname) + strlen(new_dname) > PATH_MAX - 1 || strlen(dirname) + strlen(new_dname) + 1 > SIZE_MAX) // avoiding size_t overflow
+	size_t dir_len = strlen(dirname);
+	size_t new_dirlen = strlen(new_dname);
+
+	if (PATH_MAX - 1 - new_dirlen < dir_len || SIZE_MAX - 1 - dir_len < new_dirlen) // avoiding size_t overflow
 	{
 		fprintf(stderr,"Error : Directory name is too big %s/%s\n",dirname,new_dname);
 		return false;

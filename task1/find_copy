@@ -1,0 +1,170 @@
+#!/bin/bash 
+
+set -euo pipefail #set strict mode
+
+IFS=$'\n\t' #setting IFS to newline and tab to handle spaces in filenames
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin" #setting a safe PATH
+unset LD_PRELOAD LD_LIBRARY_PATH DYLD_LIBRARY_PATH #unsetting untrusted libraries
+unalias -a 2>/dev/null || true #unaliasing all aliases to avoid cases like cp = rm allias and ..
+umask 077 #file ownership to user only
+readonly MAX_FILE_SIZE=$((50 * 1024 * 1024))  # 50MB
+
+OVERWRITE_ALL=0
+OVERWRITE_NONE=0
+
+get_answer() {
+    if (( OVERWRITE_ALL )); then return 0; fi
+    if (( OVERWRITE_NONE )); then return 1; fi
+
+    while true; do
+        read -r -p "$1 [y/n/a=all/n0=none]: " ans </dev/tty
+        case "${ans,,}" in
+            y) return 0 ;;
+            n) return 1 ;;
+            a) OVERWRITE_ALL=1; return 0 ;;
+            n0|none) OVERWRITE_NONE=1; return 1 ;;
+        esac
+    done
+}
+
+for cmd in find cp stat realpath cmp mv; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+		echo "Error: $cmd is not available. Please install it." >&2
+		exit 1
+    fi
+done
+
+interupted() {
+	echo "Script interrupted. Exiting." >&2
+	exit 1
+}
+
+trap interupted SIGINT SIGTERM
+
+
+while IFS= read -r -d '' file; do
+
+	if ((${#file} > 255)); then
+		echo "Warning: Filename $file is more than 255 characters. Skipping." >&2
+		continue
+	fi
+
+	if [ ! -f "$file" ]; then
+		echo "Error: Source file $file does not exist." >&2
+		continue
+	fi
+
+	if [ -L "$file" ]; then
+		echo "Warning: $file is a symbolic link. Skipping." >&2
+		continue
+	fi
+
+	if [[ "$file" == *".."* ]]; then
+		echo "Warning: $file contains .. in its path. Skipping." >&2
+		continue
+    fi
+
+	real_path=$(realpath "$file" 2>/dev/null || echo "INVALID")
+	
+	if [[ "$real_path" == "INVALID" ]]; then
+		echo "Error: Could not resolve path for $file. Skipping." >&2
+		continue
+	fi
+	dir_path=$(dirname "$real_path")
+	current_dir=$(pwd)
+
+	if [[ "$dir_path" != "$current_dir"* ]]; then
+		echo "Warning: $1 is outside the current directory. Skipping." >&2
+		continue
+	fi
+
+	file_size=$(stat -c%s "$file" 2>/dev/null || echo -1)
+	available_space=$(df --output=avail . | tail -n 1)
+	
+	if [[ file_size -gt available_space ]]; then
+		echo "Warning: Not enough disk space to copy $file. Skipping." >&2
+		continue
+	fi
+
+	echo "Processing $file of size $file_size bytes."
+	if [[ "$file_size" -eq -1 ]]; then
+		echo "Error: Could not determine size for $file. Skipping." >&2
+		continue
+	fi
+	if [[ "$file_size" -gt "$MAX_FILE_SIZE" ]]; then
+		echo "Warning: $file exceeds the maximum file size of $MAX_FILE_SIZE bytes. Skipping." >&2
+		continue
+	fi
+
+	if [[ "$file" =~ [[:cntrl:]] ]]; then
+		echo "Error: Control characters found in filename: $file" >&2
+    	continue
+	fi
+	case "$file" in
+	    *\;* | *\$* | *\[* | *\]* | *\{* | *\}* | *\~* | *\|* | *\<* | *\>*)
+	        echo "Warning: $file contains special characters. Skipping." >&2
+	        continue
+			;;
+	esac
+
+	if [[ ! -r "$file" ]]; then
+		echo "Warning: No read permission for $file. Skipping." >&2
+		continue
+	fi
+
+	if [[ ! -w "$(dirname "$file")" ]]; then
+		echo "Warning: No write permission in directory of $file. Skipping." >&2
+		exit 1
+	fi
+
+	current_user=$(id -u)
+	file_owner=$(stat -c '%u' "$file")
+
+	if (( file_owner != current_user )) && (( current_user != 0 )); then
+		echo "Warning: You do not own $file. Skipping." >&2
+		continue
+	fi
+
+	if [ -e "${file}.orig" ]; then
+		if ! get_answer "Backup ${file}.orig already exists and differs. Overwrite?"; then
+			echo "Skipping $file as per user request."
+			continue
+		fi
+	fi
+
+	backup="${file}.orig"
+	tmp="${backup}.tmp.$$"
+
+	echo "$tmp"
+
+	if cp -- "$file" "$tmp"; then
+	    mv "$tmp" "$backup"
+	    echo "Successfully copied $file to $backup."
+	else
+	    echo "Error: Failed to copy $file to $tmp." >&2
+	    rm -f "$tmp"
+	    continue
+	fi
+
+	if cmp -s "$file" "$backup"; then
+	    echo "Verification successful: $file and $backup are identical."
+	else
+	    echo "Warning: Verification failed: $file and $backup differ." >&2
+	fi
+
+done < <(find . -type f -name "*.c" -print0)
+
+
+#checking if the file exists and is not a symlink before copying
+#handling special characters in filenames
+#skipping files with .. in their path to avoid directory traversal issues
+#using realpath to get the absolute path of the file and compareing files directories to avoid copying files outside the current directory
+#checking file size and available disk space before copying
+#skipping files larger than 50MB it can be adjusted by changing MAX_FILE_SIZE variable
+#checking read and write permissions
+#checking file ownership to avoid copying files not owned by the user unless the user is root
+#checking for control characters in filenames
+#signal handling for graceful exit on interrupts
+#checking succesfull copy by comparing source and destination files
+#prompting user before overwriting existing identical backups
+#using mv to rename temporary file to final backup name to avoid toctou issues

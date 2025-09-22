@@ -28,8 +28,8 @@ bool get_stack_address(uintptr_t *stack_address)
 
 bool	get_stack_size() 
 {
-	struct rlimit limit; // struct for getting info about stack size
-  	if (getrlimit (RLIMIT_STACK, &limit) == -1) { // get stack size
+	struct rlimit limit; // struct for getting info about stack size	
+	if (getrlimit (RLIMIT_STACK, &limit) == -1) { // get stack size
 		perror ("getrlimit");
 		return false;
   	}

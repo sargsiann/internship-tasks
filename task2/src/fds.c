@@ -1,6 +1,6 @@
 #include "header.h"
 
-extern int max_open_files; // maximum number of open files
+extern int available_fds; // maximum number of open files
 
 bool	get_max_fds() 
 {
@@ -9,9 +9,8 @@ bool	get_max_fds()
 		perror("getrlimit");
 		return false;
 	}
-	printf("Maximum number of open files: %ld\n", fd_limit.rlim_cur);
-	max_open_files = fd_limit.rlim_cur;
-	if (max_open_files < 16) { // if max open files is less than 16
+	available_fds = fd_limit.rlim_cur;
+	if (available_fds < 16) { // if max open files is less than 16
 		fprintf(stderr, "Error: Its Dangerous to run the program, Maximum open files limit is too small\n");
 		return false;
 	}

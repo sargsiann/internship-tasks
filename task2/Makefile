@@ -1,6 +1,6 @@
 NAME = print_dir
 
-CFLAGS = -Wall -Wextra -Werror --pedantic -g3 -fsanitize=address
+CFLAGS = -Wall -Wextra -Werror --pedantic -g3
 
 SRCS = $(shell find src -type f -name "*.c")
 
