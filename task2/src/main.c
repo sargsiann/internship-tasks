@@ -35,7 +35,7 @@ void	count_file_types(char d_type)
 
 void	recursive_move_dirs(char *dirname, int	depth) 
 {
-	char *path;
+	char path[PATH_MAX] = {0};
 	DIR *dir = opendir(dirname);
 	struct dirent *dir_member;
 
@@ -57,7 +57,6 @@ void	recursive_move_dirs(char *dirname, int	depth)
 	while ((dir_member = readdir(dir)) != NULL)
 	{
 		if (stop_traversal) { // handling signal interruption
-				free(path);
 				break;
 		}
 		if (dir_member->d_type == DT_DIR) {
@@ -66,8 +65,7 @@ void	recursive_move_dirs(char *dirname, int	depth)
 			if (path_check(dirname, dir_member->d_name) == false)
 				continue;
 			//------------------------------------------------------------------------------
-			path = get_path(dirname, dir_member->d_name);
-			if (!path) // if allocation error or sprintf error
+			if (!get_path(path, dirname, dir_member->d_name)) // getting full path of directory entry
 				continue;
 			dirs_count++;
 			
@@ -75,13 +73,11 @@ void	recursive_move_dirs(char *dirname, int	depth)
 			if (recursive_mode) {
 				// FIX 2-3: ------------------------------------------------------------------------------
 				if (!check_remained_fds() || !check_stack_overflow()) {  // remainging stack and fds check
-					free(path);
 					continue;
 				}
 				// ------------------------------------------------------------------------------
 				recursive_move_dirs(path, depth + 1); // traversing into directory
 			}
-			free(path);
 			continue;
 		}
 		else if (is_valid_name(dir_member->d_name) == false) {

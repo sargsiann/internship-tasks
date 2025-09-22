@@ -33,7 +33,7 @@ bool			get_max_fds();
 bool			check_stack_overflow();
 bool			check_remained_fds();
 bool			path_check(char *dirname, char *new_dname);
-char			*get_path(char *dirname, char *dname) ;
+bool			get_path(char *path, char *dirname, char *dname);
 void			rm_last_slash(char *path);
 
 #endif

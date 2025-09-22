@@ -20,6 +20,7 @@ void handle_signal(int signal)
 	if (signal == SIGTERM) {
 		fprintf(stderr, "\nError: Termination signal (SIGTERM) received. Exiting...\n");
 	}
+
 	stop_traversal = true;
 }
 
@@ -33,7 +34,6 @@ void	setup_signal_handlers() {
 	signal(SIGQUIT, handle_signal); // handle Ctrl+ "\"
 	signal(SIGTERM, handle_signal); // handle termination signal 
 	signal(SIGPIPE, SIG_IGN); // ignore SIGPIPE to prevent termination when writing to a closed pipe
-
 }
 
 // ------------------------------------------------------------------------------

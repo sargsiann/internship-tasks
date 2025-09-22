@@ -49,23 +49,20 @@ void print_by_depth(size_t depth, char *message, char *file_name, char *parent)
     	printf("%s\n", file_name);
 }
 
-char	*get_path(char *dirname, char *dname) 
+bool get_path(char *path, char *dirname, char *dname) 
 {
-	size_t len = strlen(dirname) + strlen(dname) + 2; 
-	char *path = malloc(sizeof(char) * (len)); // one for / one for \0
-	if (!path)
-	{
-		fprintf(stderr,"Allocation error\n");
-		return NULL;
+	size_t len = strlen(dirname) + strlen(dname) + 2; // +2 for '/' and '\0'
+	if (len > PATH_MAX) {
+		fprintf(stderr,"Path length exceeds maximum limit\n");
+		return false;
 	}
 	int written_bytes = snprintf(path,len, "%s/%s", dirname, dname);
 	if (written_bytes < 0 || (size_t)written_bytes >= len)
 	{
 		fprintf(stderr,"Sprintf error");
-		free(path);
-		return NULL;
+		return false;
 	}
-	return path;
+	return true; // success
 }
 
 
