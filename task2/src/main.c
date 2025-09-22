@@ -1,6 +1,6 @@
 #include "header.h"
 
-volatile bool stop_traversal = false;
+volatile sig_atomic_t stop_traversal = 0;
 static	bool recursive_mode = false;
 uintptr_t stack_size = 0;
 int available_fds = 0;

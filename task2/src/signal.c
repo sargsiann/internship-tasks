@@ -21,7 +21,7 @@ void handle_signal(int signal)
 		fprintf(stderr, "\nError: Termination signal (SIGTERM) received. Exiting...\n");
 	}
 
-	stop_traversal = true;
+	stop_traversal = 1;
 }
 
 
