@@ -12,6 +12,13 @@ readonly MAX_FILE_SIZE=$((50 * 1024 * 1024))  # 50MB
 OVERWRITE_ALL=0
 OVERWRITE_NONE=0
 
+backups=()
+
+TOTAL_FILES=0
+COPIED_FILES=0
+SKIPPED_FILES=0
+ERROR_FILES=0
+
 get_answer() {
     if (( OVERWRITE_ALL )); then return 0; fi
     if (( OVERWRITE_NONE )); then return 1; fi
@@ -27,6 +34,12 @@ get_answer() {
     done
 }
 
+delete_backups() {
+    for backup in "${backups[@]}"; do
+        rm -f "$backup"
+    done
+}
+
 for cmd in find cp stat realpath cmp mv; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
 		echo "Error: $cmd is not available. Please install it." >&2
@@ -36,6 +49,9 @@ done
 
 interupted() {
 	echo "Script interrupted. Exiting." >&2
+	echo "Cleaning up temporary files." >&2
+	delete_backups
+	echo "Cleanup done. No files Copied Exiting." >&2
 	exit 1
 }
 
@@ -43,88 +59,121 @@ trap interupted SIGINT SIGTERM
 
 
 while IFS= read -r -d '' file; do
-
-	if ((${#file} > 255)); then
-		echo "Warning: Filename $file is more than 255 characters. Skipping." >&2
+	TOTAL_FILES=$((TOTAL_FILES + 1))
+	snapshot_start="$(stat -c '%Y %s' "$file" 2>/dev/null || echo "INVALID")"
+	#getting simple snapshot of size and modtime
+	if [[ "$snapshot_start" == "INVALID" ]]; then
+		echo "Error: Could not stat $file. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 
+	#Checking filename length
+	if ((${#file} > 255)); then
+		echo "Warning: Filename $file is more than 255 characters. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))	
+		continue
+	fi
+
+	#Checking if file exists and is not a symlink
 	if [ ! -f "$file" ]; then
 		echo "Error: Source file $file does not exist." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 
 	if [ -L "$file" ]; then
 		echo "Warning: $file is a symbolic link. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
+	#Skipping files with .. in their path to avoid directory traversal issues
 	if [[ "$file" == *".."* ]]; then
 		echo "Warning: $file contains .. in its path. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
     fi
 
+	#Using realpath to get the absolute path of the file and comparing file's directory to avoid copying files outside the current directory
 	real_path=$(realpath "$file" 2>/dev/null || echo "INVALID")
 	
 	if [[ "$real_path" == "INVALID" ]]; then
 		echo "Error: Could not resolve path for $file. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 	dir_path=$(dirname "$real_path")
 	current_dir=$(pwd)
 
+	#compareing is the directory of file is in current directory
 	if [[ "$dir_path" != "$current_dir"* ]]; then
-		echo "Warning: $1 is outside the current directory. Skipping." >&2
+		echo "Warning: $file is outside the current directory. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
+	#Checking file size and available disk space before copying
 	file_size=$(stat -c%s "$file" 2>/dev/null || echo -1)
 	available_space=$(df --output=avail . | tail -n 1)
 	
 	if [[ file_size -gt available_space ]]; then
 		echo "Warning: Not enough disk space to copy $file. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
+	#checking maximum file sizes and file size itself
 	echo "Processing $file of size $file_size bytes."
 	if [[ "$file_size" -eq -1 ]]; then
 		echo "Error: Could not determine size for $file. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 	if [[ "$file_size" -gt "$MAX_FILE_SIZE" ]]; then
 		echo "Warning: $file exceeds the maximum file size of $MAX_FILE_SIZE bytes. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
+	#checking potential problematic characters in filenames
 	if [[ "$file" =~ [[:cntrl:]] ]]; then
 		echo "Error: Control characters found in filename: $file" >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
     	continue
 	fi
 	case "$file" in
 	    *\;* | *\$* | *\[* | *\]* | *\{* | *\}* | *\~* | *\|* | *\<* | *\>*)
 	        echo "Warning: $file contains special characters. Skipping." >&2
+			SKIPPED_FILES=$((SKIPPED_FILES + 1))
 	        continue
 			;;
 	esac
 
+	#checking permissions
 	if [[ ! -r "$file" ]]; then
 		echo "Warning: No read permission for $file. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
 	if [[ ! -w "$(dirname "$file")" ]]; then
 		echo "Warning: No write permission in directory of $file. Skipping." >&2
-		exit 1
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
+		continue
 	fi
 
+	#checking file ownership 
 	current_user=$(id -u)
 	file_owner=$(stat -c '%u' "$file")
 
 	if (( file_owner != current_user )) && (( current_user != 0 )); then
 		echo "Warning: You do not own $file. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
 
+	#checking the existence and answer of what to do if the backup already exists
 	if [ -e "${file}.orig" ]; then
 		if ! get_answer "Backup ${file}.orig already exists and differs. Overwrite?"; then
 			echo "Skipping $file as per user request."
@@ -135,24 +184,41 @@ while IFS= read -r -d '' file; do
 	backup="${file}.orig"
 	tmp="${backup}.tmp.$$"
 
-	echo "$tmp"
+	#getting another snapshot to compare if the file changed during processing
+	snapshot_end="$(stat -c '%Y %s' "$file" 2>/dev/null || echo "INVALID")"
+	if [[ "$snapshot_start" != "$snapshot_end" ]]; then
+		echo "Warning: $file changed during processing. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
+		continue
+	fi
 
+	#copying the file to a temporary file first and then renaming it to avoid TOCTOU issues
 	if cp -- "$file" "$tmp"; then
 	    mv "$tmp" "$backup"
 	    echo "Successfully copied $file to $backup."
 	else
 	    echo "Error: Failed to copy $file to $tmp." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 	    rm -f "$tmp"
 	    continue
 	fi
 
+	#verifying the copy
+	#using cmp to compare files byte by byte
 	if cmp -s "$file" "$backup"; then
 	    echo "Verification successful: $file and $backup are identical."
 	else
 	    echo "Warning: Verification failed: $file and $backup differ." >&2
 	fi
-
+	backups+=("$backup")
+	COPIED_FILES=$((COPIED_FILES + 1))
 done < <(find . -type f -name "*.c" -print0)
+
+echo "Summary:"
+echo "Total files processed: $TOTAL_FILES"
+echo "Files successfully copied: $COPIED_FILES"
+echo "Files skipped: $SKIPPED_FILES"
+echo "Files with errors: $ERROR_FILES"
 
 
 #checking if the file exists and is not a symlink before copying
@@ -168,3 +234,5 @@ done < <(find . -type f -name "*.c" -print0)
 #checking succesfull copy by comparing source and destination files
 #prompting user before overwriting existing identical backups
 #using mv to rename temporary file to final backup name to avoid toctou issues
+#cleaning up temporary files on script interruption
+#using snapshots of file size and modification time to detect changes during processing

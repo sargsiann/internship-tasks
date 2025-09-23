@@ -26,6 +26,7 @@ chmod +x find_copy
 - Checks file size and OS remained memory to avoid memory issues
 - Checks file name lenght
 - Checks the directory of file to be copied for being sure that it is current directory
+- Checks the snapshot of file to prevent TOCTOU As much as possible
 
 ## Options when backups exist
 
