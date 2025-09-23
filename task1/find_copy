@@ -1,5 +1,6 @@
 #!/bin/bash 
 
+# pipefail i think its not necessary here but just in case
 set -euo pipefail #set strict mode
 
 IFS=$'\n\t' #setting IFS to newline and tab to handle spaces in filenames
@@ -7,6 +8,7 @@ export PATH="/usr/bin:/bin:/usr/sbin:/sbin" #setting a safe PATH
 unset LD_PRELOAD LD_LIBRARY_PATH DYLD_LIBRARY_PATH #unsetting untrusted libraries
 unalias -a 2>/dev/null || true #unaliasing all aliases to avoid cases like cp = rm allias and ..
 umask 077 #file ownership to user only
+unset -f command #unset function named command if it exists to use real command 
 readonly MAX_FILE_SIZE=$((50 * 1024 * 1024))  # 50MB
 
 OVERWRITE_ALL=0
@@ -68,10 +70,12 @@ while IFS= read -r -d '' file; do
 		continue
 	fi
 
+	# Extracting filename from path
+	name=$(basename "$file")
 	#Checking filename length
-	if ((${#file} > 255)); then
-		echo "Warning: Filename $file is more than 255 characters. Skipping." >&2
-		ERROR_FILES=$((ERROR_FILES + 1))	
+	if ((${#name} > 255)); then
+		echo "Warning: Filename $name is more than 255 characters. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 
@@ -109,29 +113,6 @@ while IFS= read -r -d '' file; do
 	#compareing is the directory of file is in current directory
 	if [[ "$dir_path" != "$current_dir"* ]]; then
 		echo "Warning: $file is outside the current directory. Skipping." >&2
-		SKIPPED_FILES=$((SKIPPED_FILES + 1))
-		continue
-	fi
-
-	#Checking file size and available disk space before copying
-	file_size=$(stat -c%s "$file" 2>/dev/null || echo -1)
-	available_space=$(df --output=avail . | tail -n 1)
-	
-	if [[ file_size -gt available_space ]]; then
-		echo "Warning: Not enough disk space to copy $file. Skipping." >&2
-		SKIPPED_FILES=$((SKIPPED_FILES + 1))
-		continue
-	fi
-
-	#checking maximum file sizes and file size itself
-	echo "Processing $file of size $file_size bytes."
-	if [[ "$file_size" -eq -1 ]]; then
-		echo "Error: Could not determine size for $file. Skipping." >&2
-		ERROR_FILES=$((ERROR_FILES + 1))
-		continue
-	fi
-	if [[ "$file_size" -gt "$MAX_FILE_SIZE" ]]; then
-		echo "Warning: $file exceeds the maximum file size of $MAX_FILE_SIZE bytes. Skipping." >&2
 		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
@@ -175,20 +156,34 @@ while IFS= read -r -d '' file; do
 
 	#checking the existence and answer of what to do if the backup already exists
 	if [ -e "${file}.orig" ]; then
+		if cmp -s "$file" "${file}.orig"; then #checking identical files
+			echo "Backup ${file}.orig already exists and is identical. Skipping $file."
+			SKIPPED_FILES=$((SKIPPED_FILES + 1))
+			continue
+		fi
 		if ! get_answer "Backup ${file}.orig already exists and differs. Overwrite?"; then
 			echo "Skipping $file as per user request."
 			continue
 		fi
 	fi
 
-	backup="${file}.orig"
-	tmp="${backup}.tmp.$$"
+
+
 
 	#getting another snapshot to compare if the file changed during processing
 	snapshot_end="$(stat -c '%Y %s' "$file" 2>/dev/null || echo "INVALID")"
 	if [[ "$snapshot_start" != "$snapshot_end" ]]; then
 		echo "Warning: $file changed during processing. Skipping." >&2
 		SKIPPED_FILES=$((SKIPPED_FILES + 1))
+		continue
+	fi
+
+	backup="${file}.orig"
+	tmp=$(mktemp "${file}.tmp.XXXXXX") 2>/dev/null || echo "Invalid"
+
+	if [[ "$tmp" == "Invalid" ]]; then
+		echo "Error: Could not create temporary file for $file. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
 		continue
 	fi
 
@@ -203,12 +198,37 @@ while IFS= read -r -d '' file; do
 	    continue
 	fi
 
+			#Checking file size and available disk space before copying
+	file_size=$(stat -c%s "$file" 2>/dev/null || echo -1)
+	available_space=$(df --output=avail . | tail -n 1 )
+	available_space=$((available_space * 1024)) #converting to bytes to right compare
+
+	if [[ $file_size -gt $available_space ]]; then
+		echo "Warning: Not enough disk space to copy $file. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
+		continue
+	fi
+
+	#checking maximum file sizes and file size itself
+	echo "Processing $file of size $file_size bytes."
+	if [[ "$file_size" -eq -1 ]]; then
+		echo "Error: Could not determine size for $file. Skipping." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
+		continue
+	fi
+	if [[ "$file_size" -gt "$MAX_FILE_SIZE" ]]; then
+		echo "Warning: $file exceeds the maximum file size of $MAX_FILE_SIZE bytes. Skipping." >&2
+		SKIPPED_FILES=$((SKIPPED_FILES + 1))
+		continue
+	fi
+
 	#verifying the copy
 	#using cmp to compare files byte by byte
 	if cmp -s "$file" "$backup"; then
 	    echo "Verification successful: $file and $backup are identical."
 	else
 	    echo "Warning: Verification failed: $file and $backup differ." >&2
+		continue
 	fi
 	backups+=("$backup")
 	COPIED_FILES=$((COPIED_FILES + 1))
