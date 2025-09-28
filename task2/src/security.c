@@ -15,7 +15,7 @@ bool	check_stack_overflow()
 
 bool	check_remained_fds() 
 {
-	if (available_fds <= 8) { // should not happen because of check in main
+	if (available_fds <= FDS_ALLOWED) { // should not happen because of check in main
 		fprintf(stderr, "Error: Its Dangerous to run the program, Maximum open file descpritors limit is too small\n");
 		return false;
 	}
@@ -50,7 +50,7 @@ bool	is_valid_name(char *d_name)
 	size_t size = 0;
 	while (d_name[size])
 	{
-		if (size >= PATH_MAX)
+		if (size >= NAME_MAX)
 			return false;
 		size++;	
 	}

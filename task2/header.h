@@ -7,6 +7,14 @@
  #define PATH_MAX 4096
 #endif
 
+#ifndef NAME_MAX
+ #define NAME_MAX 255
+#endif
+
+#ifndef FDS_ALOWWED
+    #define FDS_ALOWWED 16
+#endif
+
 #include <stdio.h>
 #include <dirent.h> 
 #include <string.h>

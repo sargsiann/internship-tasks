@@ -187,18 +187,7 @@ while IFS= read -r -d '' file; do
 		continue
 	fi
 
-	#copying the file to a temporary file first and then renaming it to avoid TOCTOU issues
-	if cp -- "$file" "$tmp"; then
-	    mv "$tmp" "$backup"
-	    echo "Successfully copied $file to $backup."
-	else
-	    echo "Error: Failed to copy $file to $tmp." >&2
-		ERROR_FILES=$((ERROR_FILES + 1))
-	    rm -f "$tmp"
-	    continue
-	fi
-
-			#Checking file size and available disk space before copying
+				#Checking file size and available disk space before copying
 	file_size=$(stat -c%s "$file" 2>/dev/null || echo -1)
 	available_space=$(df --output=avail . | tail -n 1 )
 	available_space=$((available_space * 1024)) #converting to bytes to right compare
@@ -221,6 +210,18 @@ while IFS= read -r -d '' file; do
 		SKIPPED_FILES=$((SKIPPED_FILES + 1))
 		continue
 	fi
+
+	#copying the file to a temporary file first and then renaming it to avoid TOCTOU issues
+	if cp -- "$file" "$tmp"; then
+	    mv "$tmp" "$backup"
+	    echo "Successfully copied $file to $backup."
+	else
+	    echo "Error: Failed to copy $file to $tmp." >&2
+		ERROR_FILES=$((ERROR_FILES + 1))
+	    rm -f "$tmp"
+	    continue
+	fi
+
 
 	#verifying the copy
 	#using cmp to compare files byte by byte
